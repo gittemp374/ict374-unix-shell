@@ -93,5 +93,32 @@ void ignore_interrupts() {
   sigaddset(&sigs, SIGINT);
   sigaddset(&sigs, SIGQUIT);
   sigaddset(&sigs, SIGTSTP);
-  sigprocmask(SIG_SETMASK, &sigs, NULL);
+  sigprocmask(SIG_BLOCK, &sigs, NULL);
+}
+
+// lineNumberToReenact == -1 refers to the last line of history 
+// Only !! is implemented at the moment
+
+void getLineOfHistory(int lineNumberToGet, char* lineToReturnTo) {
+    FILE *historyfile;
+    historyfile = fopen(HISTORY_FILE, "r");
+    char line[COMMAND_LINE_SIZE];
+    int lineNumber = 1;
+    while (fgets(line, sizeof(line), historyfile)) {
+        if (lineNumber == lineNumberToGet) {
+            strncpy(lineToReturnTo, line, COMMAND_LINE_SIZE);
+            fclose(historyfile);
+            return;
+        }
+        lineNumber++;
+    }
+    fclose(historyfile);
+    if (lineNumberToGet > lineNumber) {
+        strcpy(lineToReturnTo, "");
+        return;
+    }
+    if (lineNumberToGet == -1) {
+        // If it reaches here, the cursor will already be pointing at the last line
+        strncpy(lineToReturnTo, line, COMMAND_LINE_SIZE);
+    }
 }

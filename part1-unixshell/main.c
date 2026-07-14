@@ -90,7 +90,6 @@ int main(int argc, char *argv[]){
       if(executeBuiltIn(&command[n], prompt, historyfile, inputLine, &reenactingHistory){
         continue; 
       }
-
       // Execute Unix Shell Commands 
       else{
 
@@ -109,6 +108,18 @@ int main(int argc, char *argv[]){
     }
   }
   return 0;
+}
+
+// Save History
+void saveHistory(char *inputLine, FILE *historyfile){
+  // First checks if fputs failed 
+  if(fputs(inputLine, historyfile) == EOF ||fputs("\n", historyfile) == EOF){
+    perror("Failed to save history");
+    return; 
+  }
+  
+  int flush = fflush(historyfile);
+  //printf("%d", flush); // Uncomment for debugging
 }
 
 // Executes Built in Commands 

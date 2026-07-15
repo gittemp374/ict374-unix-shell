@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <glob.h>
+#include <fcntl.h>
 #include "token.h"
 #include "command.h"
 #include "builtin.h"
@@ -23,6 +24,8 @@ void executeCommand(Command *command); // Executes external commands (Seperators
 void claim_children(int sig); // Function to collect zombie processes
 void signalHandlerSetup();
 int expandWildCard(char *token[], char *expandedTokens[], char expandedStorage[][COMMAND_LINE_SIZE], int tokenSize);
+void redirectstdin(char* stdin_file);
+void redirectstdout(char* stdout_file);
   
 int main(int argc, char *argv[]){
   // Initialize Variables
@@ -32,7 +35,8 @@ int main(int argc, char *argv[]){
   char *expandedTokens[MAX_NUM_TOKENS]; // After glob() for wildcard implementation
   Command command[MAX_NUM_COMMANDS];
   char prompt[256] = "$ ";
-
+  int saved_stdin = dup(0);  // For reverting to after redirecting
+  int saved_stdout = dup(1); // For reverting to after redirecting
 
   signalHandlerSetup(); // Register signal handler 
   ignore_interrupts(); // Disables CTRL+C / CTRL+Z / CTRL+\ 
@@ -43,6 +47,10 @@ int main(int argc, char *argv[]){
   int reenactingHistory = 0;
 
   while(1){
+    // Reset the descriptors of stdin and stdout if they were redirected
+    dup2(saved_stdin , 0);
+    dup2(saved_stdout, 1);
+
     printf("%s", prompt);
      
     if (reenactingHistory == 0) {
@@ -96,6 +104,8 @@ int main(int argc, char *argv[]){
       }
       printf("\n");
       printf("Separator: %s\n", command[n].sep);
+      printf("Stdin file: %s\n", command[n].stdin_file);
+      printf("Stdout file: %s\n", command[n].stdout_file);
 
       // Execute Built in shell commands. 
       int result = executeBuiltIn(&command[n], prompt, historyfile, inputLine, &reenactingHistory);
@@ -137,11 +147,21 @@ int executeBuiltIn(Command *command, char prompt[], FILE *historyfile, char *inp
   if(command->argv == NULL || command->argv[0] == NULL) return 0;
   char *cmd = command->argv[0]; 
 
+  if (command->stdin_file != NULL) {
+    redirectstdin(command->stdin_file);
+  }
+
+  if (command->stdout_file != NULL) {
+    redirectstdout(command->stdout_file);
+  }
+
   // Exits the program after exit is input. 
   if (strcmp(cmd, "exit") == 0) {
+    //dup2(saved_stdin , 0);
+    //dup2(saved_stdout, 1);
     printf("Exiting shell...\n");
     fclose(historyfile);
-    exit(0);
+    exit(0); // bug: crashes if stdin and stdout are not set to their default values
   }
 
   // Return 1 If commands are Built in 
@@ -194,8 +214,34 @@ int executeBuiltIn(Command *command, char prompt[], FILE *historyfile, char *inp
   return 0; // If command is not a Built in shell comamnd 
 }
 
+void redirectstdin(char* stdin_file) {
+  if ((access(stdin_file, F_OK) != -1) && (access(stdin_file, R_OK) != -1)) {
+    return; // File does not exist
+  }
+  int stdin_desc = open(stdin_file, O_RDONLY);
+  dup2(stdin_desc, STDIN_FILENO);
+}
+
+void redirectstdout(char* stdout_file) {
+  if ((access(stdout_file, F_OK) != -1) && (access(stdout_file, W_OK) != -1)) {
+    FILE* newFile = fopen(stdout_file, "w");
+    fclose(newFile); // Open and close to create a new file if it does not exist
+  }
+  int stdout_desc = open(stdout_file, O_WRONLY | O_APPEND);
+  dup2(stdout_desc, STDOUT_FILENO);
+}
+
 // Executes external Non-Built in Unix commands usign execp 
 void executeCommand(Command *command){
+
+  if (command->stdin_file != NULL) {
+    redirectstdin(command->stdin_file);
+  }
+
+  if (command->stdout_file != NULL) {
+    redirectstdout(command->stdout_file);
+  }
+
   int pid = fork(); // All external commands will be handled by child processes 
 
   if(pid < 0){ // Fork failure 

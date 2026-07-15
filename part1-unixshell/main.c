@@ -111,11 +111,11 @@ int main(int argc, char *argv[]){
 
       // Creating a pipeline if Pipes are present in the command
       if(strcmp(command[n].sep, "|") == 0){
-        int first, last = n; // Current index. Start of pipeline 
-        int i = n; // Index to be iterated. 
+        int first = n; // Current index. Start of pipeline 
+        int last = n; // End of pipeline 
 
         // Find end of pipeline 
-        while(last < commandSize && strcmp(command[i].sep, "|") == 0){
+        while(last < commandSize - 1 && strcmp(command[last].sep, "|") == 0){
           last++;
         }
 
@@ -300,12 +300,70 @@ void runProgram(Command *command){
 
   execvp(command->argv[0], command->argv); // Run command in child process 
   perror("execv failed");
-  exit(1);
+  exit(1); 
 } 
 
 // Execute Pipe Unix commands 
 int executePipe(Command commands[], int first, int last){
-  
+  int p[2]; // 0 for read | 1 for write
+  pid_t pid; 
+  int input = STDIN_FILENO; // stores read end of previous pipe 
+
+  // Fork each command into a seperate child process 
+  for(int n = first; n <= last; n++){
+    
+    // Create pipes for each command 
+    if(n != last){
+      if(pipe(p) < 0){
+        perror("Pipe Call"); return -1; 
+      }
+    }
+
+    pid = fork();
+
+    if(pid < 0){
+      perror("fork"); 
+      return -1;
+    }
+
+    // Process for each pipes 
+    if(pid == 0){
+      // Connect previous pipe to input 
+      if(input != STDIN_FILENO){
+        dup2(input, STDIN_FILENO);
+        close(input);
+      }
+
+      // Connect stdout to the next pipe 
+      if(n != last){
+        dup2(p[1], STDOUT_FILENO);
+        close(p[0]);
+        close(p[1]);
+      }
+
+      runProgram(&commands[n]);
+    }
+
+    // In Parent, Close pipe ends 
+    if(pid > 0){
+      if(input != STDIN_FILENO){
+        close(input);
+      }
+
+      // Save Input 
+      if(n != last){
+        close(p[1]); // Close write end
+        input = p[0]; // Save input 
+      }
+    }
+  }
+
+  // Wait for the pipeline commands to finish 
+  for(int n = first; n <= last; n++){
+    wait(NULL);
+  }
+
+  return 0;
 }
 
 // Claims zombie child processes when child process is finished executing 

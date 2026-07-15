@@ -20,8 +20,9 @@
 
 void saveHistory(char *inputLine, FILE *historyfile);
 int executeBuiltIn(Command *cmd, char prompt[], FILE *historyfile, char *inputLine, int *reenactingHistory);
-void executeCommand(Command *command); // Executes external commands (Seperators ; and &)
-//int executePipe(Command *command); // Executes Pipes (|)
+void executeCommand(Command *command); // Forks external commands (Seperators ; and &)
+void runProgram(Command *command); // Runs the program 
+int executePipe(Command commands[], int first, int last); 
 void claim_children(int sig); // Function to collect zombie processes
 void signalHandlerSetup();
 int expandWildCard(char *token[], char *expandedTokens[], char expandedStorage[][COMMAND_LINE_SIZE], int tokenSize);
@@ -118,6 +119,22 @@ int main(int argc, char *argv[]){
       // IF !! is entered. break loop 
       if(result == 2){
         break;
+      }
+
+      // Creating a pipelien if Pipes are present in the command
+      if(strcmp(strcommand[n].sep, "|") == 0){
+        int first = n; // Current index. Start of pipeline 
+        int i = n; // Index to be iterated. 
+        int last; 
+
+        // Find end of pipeline 
+        while(strcmp(command.sep[i], "|") == 0){
+          last = i; 
+          i++;
+        }
+
+        executePipe(command, first, last);
+        continue; 
       }
 
       // Execute Unix Shell Commands 
@@ -248,27 +265,15 @@ void redirectstdout(char* stdout_file) {
 
 // Executes external Non-Built in Unix commands usign execp 
 void executeCommand(Command *command){
-
-  // Input redirection and output redirection 
-  if (command->stdin_file != NULL) {
-    redirectstdin(command->stdin_file);
-  }
-
-  if (command->stdout_file != NULL) {
-    redirectstdout(command->stdout_file);
-  }
-
   int pid = fork(); // All external commands will be handled by child processes 
+  
+  if(pid == 0){ // In Child 
+    runProgram(command);
+  }
 
   if(pid < 0){ // Fork failure 
     perror("fork");
     return;
-  }
-
-  if(pid == 0){ // In Child 
-    execvp(command->argv[0], command->argv); // Run command in child process 
-    perror("execv failed");
-    exit(1);
   }
 
   // In Parent
@@ -280,6 +285,28 @@ void executeCommand(Command *command){
       waitpid(pid, NULL, 0);
     }
   }
+}
+
+// Conducts the process of running the program inside of child fork 
+void runProgram(Command *command){
+  // Input Redirection
+  if (command->stdin_file != NULL) {
+    redirectstdin(command->stdin_file);
+  }
+
+  // Output Redirection
+  if (command->stdout_file != NULL) {
+    redirectstdout(command->stdout_file);
+  }
+
+  execvp(command->argv[0], command->argv); // Run command in child process 
+  perror("execv failed");
+  exit(1);
+} 
+
+// Execute Pipe Unix commands 
+int executePipe(Command commands[], int first, int last){
+  
 }
 
 // Claims zombie child processes when child process is finished executing 

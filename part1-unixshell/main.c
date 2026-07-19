@@ -23,6 +23,7 @@ int main(int argc, char *argv[]){
   char *expandedTokens[MAX_NUM_TOKENS]; // After glob() for wildcard implementation
   Command command[MAX_NUM_COMMANDS];
   char prompt[256] = "$ ";
+  int debugMode = 0; 
   //TODO: Replace these with a struct
   int saved_stdin  = dup(0); // For reverting to after redirecting
   int saved_stdout = dup(1); // For reverting to after redirecting
@@ -87,8 +88,12 @@ int main(int argc, char *argv[]){
     if(commandSize == 0) continue; 
 
     // Print and execute the commands 
-    for(int n = 0; n < commandSize; n++){
-      printCommand(command, expandedTokens, n); // Comment this out when not debugging
+    for(int n = 0; n < commandSize; n++){\
+      
+      // Only print debug information when debug mode is on 
+      if(debugMode){
+        printCommand(command, expandedTokens, n); // Comment this out when not debugging
+      }
 
       // Creating a pipeline if Pipes are present in the command
       if(strcmp(command[n].sep, "|") == 0){
@@ -107,7 +112,7 @@ int main(int argc, char *argv[]){
 
       // Execute Built in shell commands. 
       int result = executeBuiltIn(&command[n], prompt, historyfile, inputLine, &reenactingHistory);
-
+      
       // For built in commands
       if(result == 1){
         continue; 
@@ -116,6 +121,17 @@ int main(int argc, char *argv[]){
       // IF ! is entered. break loop 
       if(result == 2){
         break;
+      }
+
+      // Checks if debug mode is entered 
+      if(result == 3){
+        debugMode = 1; 
+        continue; 
+      }
+
+      if(result == 4){
+        debugMode = 0; 
+        continue; 
       }
 
       // Execute Unix Shell Commands 

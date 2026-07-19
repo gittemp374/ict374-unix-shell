@@ -167,7 +167,20 @@ int executeBuiltIn(Command *command, char prompt[], FILE *historyfile, char *inp
   if (strcmp(cmd, "history") == 0) {
     history(historyfile);
     return 1; 
-  } 
+  }
+
+  // Prints the Debug code
+  if(strcmp(cmd, "debug") == 0 && command->argv[1] != NULL){
+    if(strcmp(command->argv[1], "on") == 0){
+      return 3; // Turn Debug mode on 
+    }
+
+    if(strcmp(command->argv[1], "off") == 0){
+      return 4; // Turn Debug mode off 
+    }
+
+    return 0;  
+  }
 
   // Executing line of code from history
   if (strncmp(cmd, "!", 1) == 0) {

@@ -41,7 +41,6 @@ int main(int argc, char *argv[]){
 
   while(1){
     // Reset the descriptors of stdin and stdout if they were redirected
-    // TODO: May need to remove 
     dup2(saved_stdin , 0);
     dup2(saved_stdout, 1);
     dup2(saved_stderr, 2);
@@ -49,19 +48,27 @@ int main(int argc, char *argv[]){
     again = 1;
     if (reenactingHistory == 0) {
       // Breaks out the loop if readLine fails.
-      while (again) {//
-        again = 0;//
-        if(readLine(inputLine, COMMAND_LINE_SIZE, prompt, historyfile) == -1) {
-          //if(fgets(inputLine, COMMAND_LINE_SIZE, stdin) == NULL) {
-          fclose(historyfile);
-          break;
-        }    
-        if (inputLine == NULL) {//
-          if (errno = EINTR) {//
-            again = 1;//
-          }//
-        }//
-      }//
+      while (again) {
+        again = 0;
+        
+        // Local Interactive terminal 
+        if(isatty(STDIN_FILENO)){
+          if(readLine(inputLine, COMMAND_LINE_SIZE, prompt, historyfile) == -1) {
+            fclose(historyfile);
+            break;
+          }
+          if (inputLine == NULL) {
+            if (errno = EINTR) {
+              again = 1;
+            }
+          }
+        } else {
+          if(fgets(inputLine, COMMAND_LINE_SIZE, stdin) == NULL) {
+            fclose(historyfile);
+            break; 
+          }
+        }
+      }
         
     } else if (reenactingHistory == 1) {
       reenactingHistory = 0; // allows the user to enter input in the next iteration

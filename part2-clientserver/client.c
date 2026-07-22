@@ -14,11 +14,14 @@
 #include <unistd.h> // gethostname 
 #include <string.h>
 #include <stdio.h>
+#include <signal.h>
 #include "stream.h" // MAX_BLOCK_SIZE, readn(), writen()
 #include "client_io.h" // For Raw mode input handling and arrow key usage 
 #include "history.h" // For history handling through arrow keys, !!, !, and history command 
 
 #define SERV_TCP_PORT 4005 // server's "well-known" port number
+void sendInput(int sd);
+void receiveOutput(int sd); 
 int authenticate_client(int sd); // Header for authentication function 
 
 int main(int argc, char *argv[]){
@@ -27,7 +30,6 @@ int main(int argc, char *argv[]){
   char host[60]; // Stores server host name 
   struct sockaddr_in serverAddress; // Stores server IP and Port  
   struct hostent *hp; // Stored data from gethostbyname()
-  FILE *historyfile = initializeHistory();
   
   // Get server host name 
   if(argc == 1){ 
@@ -62,46 +64,41 @@ int main(int argc, char *argv[]){
 
   printf("Login Successful!\n");
 
-  // Main loop if connected successfully 
-  // TODO: Make the input stream and output streak child processes, make parent program send full commands 
-  while(1){ 
-    char line[MAX_BLOCK_SIZE]; 
-    // TODO: CHANGE TO MAX COMMAND SIZE 
-    int lineLength = readLine(line, MAX_BLOCK_SIZE, "% ", historyfile);
-    if(lineLength <= 0) continue; 
-
-    saveHistory(line, historyfile); // Save Local history 
-    
-    // Get user input and add null terminator 
-    // if(buf[nr-1] == '\n') buf[nr-1] = '\0'; --nr; 
-
-    /*Send message if string is not empty 
-    if(lineLength > 0){
-      // Sends command to server and reads response 
-      nw = writen(sd, line, lineLength); // Send actual command 
-      char newline = '\n'; 
-      writen(sd, &newline, 1);
-
-      while(nr = readn(sd, buf, sizeof(buf)) > 0){
-        buf[nr] = '\0';
-        printf("%s". buf);
-
-        if(strcmp(buf,))
-      }
+  pid_t pid = fork(); // Create child processes for receiving terminal output  
   
-      // TODO: Change this to a proper disconnect code ( -1);
-      buf[nr] = '\0';
-      if(strcmp(buf, "Good-bye!") == 0){
-        printf("Disconnected from Server\n", buf); 
-        close(sd);
-        exit(0);
-      }
+  // Child receives output from the the server terminal  
+  if(pid == 0){ 
+    receiveOutput(sd); 
+  } 
 
-      // Display message from server 
-      printf("%s", buf);
-    }
-    */
+  // Parent sends input to the terminal 
+  else{ 
+    sendInput(sd);
+    kill(pid, SIGTERM); 
   }
+}
+
+void sendInput(int sd){
+  char buf[MAX_BLOCK_SIZE]; 
+  int n; 
+
+  // constant stream of character inputs from keyboard sent to the server 
+  while((n = read(STDIN_FILENO, buf, sizeof(buf))) > 0){
+    if(writen(sd, buf, n) != n) break; // Send to the server
+  }
+}
+
+void receiveOutput(int sd){
+  char buf[MAX_BLOCK_SIZE];
+  int n; 
+
+  // Reads constant stream of data from the server 
+  // read() used over readn() because characters are sent as a continous stream 
+  while((n = read(sd, buf, sizeof(buf))) > 0){
+    write(STDOUT_FILENO, buf, n); // Prints to terminal 
+  }
+
+  return; 
 }
 
 int authenticate_client(int sd){

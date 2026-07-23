@@ -35,14 +35,17 @@ void change_prompt(char* prompt, char** argv, int last) {
   char newPromptBuffer[256] = "";
 
   // Blocks empty prompt 
-  if(last < 1){
+  if(last < 2){
     return;
   }
 
-  for (int i = 1; i <= last; i++) {
+  for (int i = 1; i < last; i++) {
     strcat(newPromptBuffer, argv[i]);
-    strcat(newPromptBuffer, " ");
+
+    if(i != last -1) strcat(newPromptBuffer, " ");
   }
+
+  strcat(newPromptBuffer, " ");
   strcpy(prompt, newPromptBuffer);
   return;
 }

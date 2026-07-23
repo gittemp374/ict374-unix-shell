@@ -8,32 +8,86 @@
 #include <string.h> 
 #include "token.h"
 
+// Tokenize outputs the same as the previous tokenizer using strtok() but properly handles "", '', and \
+// tk = current character in string
+// *tk = Values of the current character in string
+// cleanToken = Final tokenized string stored in token array.
 int tokenize(char* inputLine, char *token[]){
-  char *tk; // Current token
-  int n = 0; // Current token count/position. 
+  char *tk = inputLine; // Current character initialized as the first character of the input line
+  int n = 0; // Number of tokens
 
-  // strtok = string tokenizer for C++ | String then Delimiter
-  // MAX_NUM_TOKENS anmd delimiters are defined in token.h 
-  tk = strtok(inputLine, delimiters);
-  token[n] = tk;
+  // Loops through the fuill input line
+  // Each iteration finds one complete token
+  // Iterates through each word in the inputLine
+  while(*tk != '\0'){
+    while(*tk == ' ' || *tk == '\t' || *tk == '\n') tk++; // Ignore delimiters
 
-  while(tk != NULL){
-    // Pre-increment n. 
-    ++n; 
-    
-    // if the current number of seperated tokens exceeds max. Count becomes -1 and returns. 
-    if(n >= MAX_NUM_TOKENS){
-      n = -1; 
-      break;
+    // Break out of tokenization loop if end of string if found
+    if(*tk == '\0') break;
+
+    token[n] = tk; // Initialize first token index as position of the first character of token
+    int isDoubleQuote = 0; // Checks if string is inside double quote
+    int isSingleQuote = 0; // Checks if string is inside single quotes
+    char *cleanToken = tk; // Full tokenized string
+
+    // Loops through one token/word in the inputLine
+    // Finds the start and end of each token and accounts for "", '', and \
+    // Iterates through each character in the inputLine, Stops when delimiter is found
+    while(*tk != '\0'){
+
+      // Handles \. Deletes it and finalizes token
+      if(*tk == '\\'){
+        tk++; // Skips '\'
+
+        // Checks next char value.
+        if(*tk != '\0'){
+          *cleanToken = *tk;
+          cleanToken++;
+          tk++;
+        }
+        continue;
+      }
+
+      // Handles double quotes.
+      if(*tk == '"' && !isSingleQuote){
+        isDoubleQuote = !isDoubleQuote;
+        tk++;
+        continue;
+      }
+
+      // Handles Singles quotes, ignores delminiter if found in quote
+      if(*tk == '\'' && !isDoubleQuote){
+        isSingleQuote = !isSingleQuote;
+        tk++;
+        continue;
+      }
+
+      // Completes token when delmiter is found and the token is not inside of quotes
+      if((*tk == ' ' || *tk == '\t' || *tk == '\n') && !isDoubleQuote && !isSingleQuote){
+        *tk = '\0';
+        tk++;
+        break;
+      }
+
+      // Copies value of current character to the clean token and moves onto the next
+      *cleanToken = *tk;
+      cleanToken++;
+      tk++;
     }
 
-    // Continues tokenizing from where it left off last. NULL does NOT mean the string passed is null. 
-    // Loop ends when current token is null. 
-    tk = strtok(NULL, delimiters);
-    token[n] = tk;
+    *cleanToken = '\0'; // End of string
+
+    // Checks for mismatching quotes
+    if(isDoubleQuote || isSingleQuote) return -1;
+
+    n++; // Move on to the next character in string
+
+    // If current number of tokens exceed max value, error is returned;
+    if(n >= MAX_NUM_TOKENS) return -1;
   }
-  
-  return n; 
+  // Set the end of the token array to null. End of the array
+  token[n] = NULL;
+  return n;
 }
 
 // BUG: potential overflow with over 500 files if found. add edge case check 

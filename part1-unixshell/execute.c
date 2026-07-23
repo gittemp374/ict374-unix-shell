@@ -165,7 +165,10 @@ int executeBuiltIn(Command *command, char prompt[], FILE *historyfile, char *inp
       return 1;
     }
 
-    change_prompt(prompt, command->argv, command->last);
+    // Find number of arguments. Required to avoid segmentation crash
+    int argc = 0;
+    while(command->argv[argc] != NULL) argc++;
+    change_prompt(prompt, command->argv, argc);
     return 1; 
   }
 
